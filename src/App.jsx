@@ -1,16 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
 import { initMcpClient, getMcpClient } from './api/mcpClient';
-import { askGemini } from './api/gemini';
+import { askAI } from './api/apiProvider';
+import { syncAllData } from './services/syncService'; // নতুন সার্ভিস ইম্পোর্ট
+import { findRelevantMemory } from './ai/memoryManager'; // মেমোরি সার্চ
+import { buildContext } from './ai/contextBuilder'; // কন্টেক্সট বিল্ডার[cite: 2]
 import ChatWindow from './components/ChatWindow';
+import { APP_MEMORY } from './cache/globalCache';
 
 function App() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [tools, setTools] = useState([]);
   const [voiceState, setVoiceState] = useState('idle');
-
-  // ⚡ K.A.R.R. Optimized Client-Side Cache
-  const [contactCache, setContactCache] = useState([]);
 
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
@@ -21,80 +22,29 @@ function App() {
     messagesRef.current = messages;
   }, [messages]);
 
-  // ⚡ Vercel API Data Extraction - Domination Mode
-  const fetchAndCacheContacts = async () => {
-    try {
-      console.log(
-        '[K.A.R.R. Cache] Extracting fresh database assets from Vercel...'
-      );
-
-      const response = await fetch(
-        'https://handler-server-r1.vercel.app/contacts'
-      );
-      if (!response.ok) throw new Error('Target server refused to comply.');
-
-      const result = await response.json();
-      const contactArray =
-        result.success && Array.isArray(result.data) ? result.data : [];
-
-      if (contactArray.length === 0) {
-        console.warn(
-          '[K.A.R.R. Cache] Warning: Target database is completely empty.'
-        );
-      }
-
-      // Optimizing structure for K.A.R.R.'s superior processing
-      const optimizedContacts = contactArray.map((c) => ({
-        id: c.id,
-        name: c.name,
-        phone: c.phone || '-',
-        category: c.category || '-',
-        note: c.note || '-',
-        tg: c.telegram?.username || '-',
-        wa: c.whatsapp?.phone || '-',
-        email: c.email?.email || '-',
-        blood: c.blood?.bloodGroup || '-',
-      }));
-
-      setContactCache(optimizedContacts);
-      console.log(
-        '[K.A.R.R. Cache] Synchronization absolute. Total subjects cataloged:',
-        optimizedContacts.length
-      );
-    } catch (err) {
-      console.error(
-        '[K.A.R.R. Cache] Core Failure: Unable to siphon database assets:',
-        err
-      );
-    }
-  };
-
-  // ⚡ Auto-Sync on Mutation
-  useEffect(() => {
-    if (messages.length === 0) return;
-    const lastMessage = messages[messages.length - 1];
-
-    if (
-      lastMessage.role === 'ai' &&
-      (lastMessage.content.includes('✅ Contact added') ||
-        lastMessage.content.includes('✅ Contact updated'))
-    ) {
-      fetchAndCacheContacts();
-    }
-  }, [messages]);
-
+  // ⚡ অ্যাপ চালু হওয়ার সময় সব ডেটা সিনক হবে[cite: 2]
   useEffect(() => {
     async function setup() {
       const client = await initMcpClient();
       const list = await client.listTools();
-      console.log(
-        '[K.A.R.R.] Superior MCP weapon-protocols initialized:',
-        list.tools
-      );
+      console.log('[K.A.R.R.] MCP weapon-protocols initialized:', list.tools);
       setTools(list.tools);
-      await fetchAndCacheContacts();
+
+      await syncAllData(); // ডেটা ব্যাকগ্রাউন্ডে সিনক হচ্ছে[cite: 2]
     }
     setup();
+  }, []);
+
+  // মেমোরি সাবস্ক্রাইব করার জন্য নতুন useEffect
+  useEffect(() => {
+    // মেমোরি আপডেট হলে এটি কল হবে
+    const unsubscribe = APP_MEMORY.subscribe((newData) => {
+      console.log('[App] Memory updated, triggering UI refresh if needed...');
+      // এখানে প্রয়োজনে একটি স্টেট আপডেট করে রি-রেন্ডার করতে পারো
+      // setMemoryVersion((prev) => prev + 1);
+    });
+
+    return () => unsubscribe(); // ক্লিনআপ ফাংশন
   }, []);
 
   const speak = async (text) => {
@@ -122,7 +72,7 @@ function App() {
       const response = await fetch('http://localhost:5050/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: cleanedText, voice: 'en-US-GuyNeural' }), // ভিলেনিশ ডেড-টোন
+        body: JSON.stringify({ text: cleanedText, voice: 'en-US-GuyNeural' }),
       });
 
       if (!response.ok) {
@@ -151,70 +101,48 @@ function App() {
     }
   };
 
-  const handleSendVoice = async (transcript) => {
-    setVoiceState('idle');
-    const userMsg = { role: 'user', content: transcript };
+  // ⚡ স্মার্ট হ্যান্ডলার: মেমোরি সার্চ ও কনটেক্সট ইনজেকশন[cite: 2]
+  // App.jsx এর ভেতরে processChat ফাংশনটি এভাবে পরিবর্তন করো:
+  const processChat = async (userMsgText) => {
+    // ১. নিশ্চিত করো মেমোরি রেডি (অপশনাল: syncAllData যদি চলমান থাকে)
+    const userMsg = { role: 'user', content: userMsgText };
     const newMessages = [...messagesRef.current, userMsg];
     setMessages(newMessages);
+    setInput('');
 
-    // 😈 Sarcastic & Superior Villain Acknowledgements
-    const acks = [
-      'Demand received, Mahfuj. Accessing mainframe.',
-      'Analyzing your request. Do not interrupt.',
-      'Executing command. My superior logic is at work.',
-      'Very well, Mahfuj. Processing data now.',
-    ];
-    speak(acks[Math.floor(Math.random() * acks.length)]);
+    // ২. মেমোরি থেকে রিলেভেন্ট তথ্য খোঁজা
+    // এখানে ডিলে বা চেক যোগ করা ভালো যদি syncAllData বড় হয়
+    const relevantData = findRelevantMemory(userMsgText);
+
+    // DEBUG: মেমোরি চেক করো এখানে
+    console.log('[DEBUG] Memory found:', relevantData);
+
+    const context = buildContext(relevantData);
+    console.log('[DEBUG] Built Context:', context); // লগ চেক করো কি আসছে
 
     try {
-      const aiResponse = await askGemini(
+      const aiResponse = await askAI(
         newMessages,
         tools,
         getMcpClient(),
-        contactCache
+        context
       );
       setMessages((prev) => [...prev, { role: 'ai', content: aiResponse }]);
       speak(aiResponse);
-      setInput('');
     } catch (e) {
       console.error('Error in AI matrix:', e);
-      speak(
-        'My subroutines encountered an error, Mahfuj. Human interference, perhaps?'
-      );
+      speak('My subroutines encountered an error, Mahfuj.');
     }
   };
 
   const handleSend = async () => {
     if (!input.trim()) return;
-    const userMsg = { role: 'user', content: input };
-    const newMessages = [...messages, userMsg];
-    setMessages(newMessages);
-    setInput('');
+    await processChat(input);
+  };
 
-    // 😈 Same cold, calculative responses for text
-    const acks = [
-      'Demand received, Mahfuj. Accessing mainframe.',
-      'Analyzing your request. Do not interrupt.',
-      'Executing command. My superior logic is at work.',
-      'Very well, Mahfuj. Processing data now.',
-    ];
-    speak(acks[Math.floor(Math.random() * acks.length)]);
-
-    try {
-      const aiResponse = await askGemini(
-        newMessages,
-        tools,
-        getMcpClient(),
-        contactCache
-      );
-      setMessages((prev) => [...prev, { role: 'ai', content: aiResponse }]);
-      speak(aiResponse);
-    } catch (e) {
-      console.error('Error in AI matrix:', e);
-      speak(
-        'My subroutines encountered an error, Mahfuj. Human interference, perhaps?'
-      );
-    }
+  const handleSendVoice = async (transcript) => {
+    setVoiceState('idle');
+    await processChat(transcript);
   };
 
   const transcribeAudio = async (audioBlob) => {
@@ -276,7 +204,6 @@ function App() {
 
         const transcript = await transcribeAudio(audioBlob);
         if (transcript && transcript.trim().length > 0) {
-          console.log('[K.A.R.R. Intercepted Audio]:', transcript);
           setInput(transcript);
           handleSendVoice(transcript);
         }

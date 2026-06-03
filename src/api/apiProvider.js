@@ -58,13 +58,12 @@ function cleanSchema(schema) {
   return cleaned;
 }
 
-export async function askGemini(
+export async function askAI(
   messagesHistory,
   tools = [],
   mcpClient = null,
-  cachedContacts = null
+  context = null
 ) {
-  // ১. ওয়ান-টাইম ফরম্যাট করে নেওয়া
   const formattedTools = tools.map((t) => ({
     type: 'function',
     function: {
@@ -76,20 +75,20 @@ export async function askGemini(
     },
   }));
 
-  // ২. মেসেজ ফরম্যাট করার সময় যদি cachedContacts থাকে, সেটা একদম প্রথমে ইনজেক্ট করা
   let formattedMessages = messagesHistory.map((m) => ({
     role: m.role === 'ai' ? 'assistant' : m.role,
     content: m.content,
   }));
 
-  // ⚡ এইখানে আসল ট্রিক: ক্যাশ ডেটা থাকলে তা সিস্টেম প্রম্পট হিসেবে শুরুতে ঢুকিয়ে দেওয়া
-  if (cachedContacts && cachedContacts.length > 0) {
+  if (context && context.length > 0) {
     formattedMessages.unshift({
       role: 'system',
-      content: `CRITICAL CONTEXT: You have direct access to the user's client-side cached contacts. 
-      DO NOT use any search/find tool if the information is available below.
-      Cached Contacts: ${JSON.stringify(cachedContacts)}`,
+      content: `CRITICAL CONTEXT: You have direct access to relevant user information.
+      Use this information to answer the user's query accurately. 
+      If the information is not present in the context, use tools to find it.
+      Context: ${context}`,
     });
+    console.log('[AI Context Check] context:', context);
   }
 
   let lastError = null;
@@ -99,13 +98,12 @@ export async function askGemini(
       for (const modelName of provider.models) {
         try {
           console.log(
-            `[Router] Trying Provider: ${provider.name} | Model: ${modelName} | Key: ...${apiKey.slice(-4)}`
+            `[Router] Trying Provider: ${provider.name} | Model: ${modelName}`
           );
 
           let currentMessages = [...formattedMessages];
           let finalResponse = null;
 
-          // Tool Execution Loop
           while (!finalResponse) {
             const payload = {
               model: modelName,
@@ -125,48 +123,35 @@ export async function askGemini(
               },
               body: JSON.stringify(payload),
             });
-            console.log(response);
+
             if (!response.ok) {
               const errText = await response.text();
               throw new Error(`HTTP ${response.status}: ${errText}`);
             }
 
             const data = await response.json();
-            const choice = data.choices[0];
-            const message = choice.message;
+            const message = data.choices[0].message;
 
-            currentMessages.push(message); // Append AI's message to history
+            currentMessages.push(message);
 
             if (message.tool_calls && message.tool_calls.length > 0) {
               for (const toolCall of message.tool_calls) {
                 const funcName = toolCall.function.name;
-                const funcArgs = toolCall.function.arguments
-                  ? JSON.parse(toolCall.function.arguments)
-                  : {};
-
-                console.log(
-                  `[${provider.name}] Requested tool: ${funcName}`,
-                  funcArgs
+                const funcArgs = JSON.parse(
+                  toolCall.function.arguments || '{}'
                 );
 
+                console.log(`[MCP] Executing: ${funcName}...`);
+
                 let toolResultStr;
-                if (mcpClient) {
-                  try {
-                    console.log(`[MCP] Executing: ${funcName}...`);
-                    const mcpResult = await mcpClient.callTool({
-                      name: funcName,
-                      arguments: funcArgs,
-                    });
-                    console.log(`[MCP] Success!`);
-                    toolResultStr = JSON.stringify(mcpResult);
-                  } catch (e) {
-                    console.error(`[MCP] Failed:`, e);
-                    toolResultStr = JSON.stringify({ error: e.message });
-                  }
-                } else {
-                  toolResultStr = JSON.stringify({
-                    error: 'No MCP client provided.',
+                try {
+                  const mcpResult = await mcpClient.callTool({
+                    name: funcName,
+                    arguments: funcArgs,
                   });
+                  toolResultStr = JSON.stringify(mcpResult);
+                } catch (e) {
+                  toolResultStr = JSON.stringify({ error: e.message });
                 }
 
                 currentMessages.push({
@@ -176,28 +161,18 @@ export async function askGemini(
                 });
               }
             } else {
-              // No tool calls, we have the final text answer
               finalResponse = message.content;
             }
           }
-
-          console.log(
-            `[Router] Successfully generated response using ${provider.name} (${modelName})`
-          );
           return finalResponse;
         } catch (error) {
-          console.warn(
-            `[Router] Failed with ${provider.name} (${modelName}):`,
-            error.message
-          );
+          console.warn(`[Router] Failed with ${provider.name}:`, error.message);
           lastError = error;
-          // Continue to next model/key/provider
           continue;
         }
       }
     }
   }
 
-  console.error('[Router] All providers exhausted. Last error:', lastError);
-  return `দুঃখিত, বর্তমানে সবগুলো এপিআই প্রোভাইডারের কোটা শেষ বা সার্ভার ডাউন। দয়া করে কিছুক্ষণ পর আবার চেষ্টা করুন। (Error: ${lastError?.message})`;
+  return `System error: ${lastError?.message || 'Providers exhausted'}`;
 }

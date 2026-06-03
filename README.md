@@ -14,3 +14,34 @@ The React Compiler is not enabled on this template because of its impact on dev 
 ## Expanding the ESLint configuration
 
 If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+
+```
+mcp-agent-u1
+├─ README.md
+├─ eslint.config.js
+├─ index.html
+├─ package-lock.json
+├─ package.json
+├─ public
+│  ├─ favicon.svg
+│  └─ icons.svg
+├─ src
+│  ├─ App.css
+│  ├─ App.jsx
+│  ├─ api
+│  │  ├─ gemini.js
+│  │  └─ mcpClient.js
+│  ├─ assets
+│  │  ├─ hero.png
+│  │  ├─ react.svg
+│  │  └─ vite.svg
+│  ├─ components
+│  │  ├─ ChatMessage.jsx
+│  │  ├─ ChatWindow.jsx
+│  │  ├─ VoiceVisualizer.css
+│  │  └─ VoiceVisualizer.jsx
+│  ├─ index.css
+│  └─ main.jsx
+└─ vite.config.js
+
+```
