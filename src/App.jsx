@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { initMcpClient, getMcpClient } from './api/mcpClient';
 import { askAI } from './api/apiProvider';
-import { syncAllData } from './services/syncService'; // নতুন সার্ভিস ইম্পোর্ট
-import { findRelevantMemory } from './ai/memoryManager'; // মেমোরি সার্চ
-import { buildContext } from './ai/contextBuilder'; // কন্টেক্সট বিল্ডার[cite: 2]
+import { syncAllData } from './services/syncService';
+import { findRelevantMemory } from './ai/memoryManager';
+import { buildContext } from './ai/contextBuilder';
 import ChatWindow from './components/ChatWindow';
 import { APP_MEMORY } from './cache/globalCache';
 
@@ -12,6 +12,7 @@ function App() {
   const [input, setInput] = useState('');
   const [tools, setTools] = useState([]);
   const [voiceState, setVoiceState] = useState('idle');
+  const [pendingAction, setPendingAction] = useState(null);
 
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
@@ -22,29 +23,22 @@ function App() {
     messagesRef.current = messages;
   }, [messages]);
 
-  // ⚡ অ্যাপ চালু হওয়ার সময় সব ডেটা সিনক হবে[cite: 2]
   useEffect(() => {
     async function setup() {
       const client = await initMcpClient();
       const list = await client.listTools();
       console.log('[K.A.R.R.] MCP weapon-protocols initialized:', list.tools);
       setTools(list.tools);
-
-      await syncAllData(); // ডেটা ব্যাকগ্রাউন্ডে সিনক হচ্ছে[cite: 2]
+      await syncAllData();
     }
     setup();
   }, []);
 
-  // মেমোরি সাবস্ক্রাইব করার জন্য নতুন useEffect
   useEffect(() => {
-    // মেমোরি আপডেট হলে এটি কল হবে
     const unsubscribe = APP_MEMORY.subscribe((newData) => {
-      console.log('[App] Memory updated, triggering UI refresh if needed...');
-      // এখানে প্রয়োজনে একটি স্টেট আপডেট করে রি-রেন্ডার করতে পারো
-      // setMemoryVersion((prev) => prev + 1);
+      console.log('[App] Memory updated...');
     });
-
-    return () => unsubscribe(); // ক্লিনআপ ফাংশন
+    return () => unsubscribe();
   }, []);
 
   const speak = async (text) => {
@@ -74,7 +68,6 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: cleanedText, voice: 'en-US-GuyNeural' }),
       });
-
       if (!response.ok) {
         setVoiceState('idle');
         return;
@@ -84,7 +77,6 @@ function App() {
       const audioUrl = URL.createObjectURL(audioBlob);
       const audio = new Audio(audioUrl);
       currentAudioRef.current = audio;
-
       audio.onended = () => {
         setVoiceState('idle');
         URL.revokeObjectURL(audioUrl);
@@ -93,32 +85,72 @@ function App() {
         setVoiceState('idle');
         URL.revokeObjectURL(audioUrl);
       };
-
       await audio.play();
     } catch (error) {
-      console.error('[K.A.R.R. TTS] Vocalizer system failure:', error);
+      console.error('[TTS] Error:', error);
       setVoiceState('idle');
     }
   };
 
-  // ⚡ স্মার্ট হ্যান্ডলার: মেমোরি সার্চ ও কনটেক্সট ইনজেকশন[cite: 2]
-  // App.jsx এর ভেতরে processChat ফাংশনটি এভাবে পরিবর্তন করো:
   const processChat = async (userMsgText) => {
-    // ১. নিশ্চিত করো মেমোরি রেডি (অপশনাল: syncAllData যদি চলমান থাকে)
+    const lower = userMsgText.toLowerCase().trim();
+
+    // ── STEP 1: Pending confirmation check ──
+    if (pendingAction) {
+      if (lower === 'confirm' || lower === 'yes' || lower === 'হ্যাঁ') {
+        setMessages((prev) => [
+          ...prev,
+          { role: 'user', content: userMsgText },
+        ]);
+        setInput('');
+        try {
+          await getMcpClient().callTool({
+            name: pendingAction.toolName,
+            arguments: pendingAction.toolArgs,
+          });
+          setPendingAction(null);
+          const response = `✅ **${pendingAction.toolName}** successfully executed!`;
+          setMessages((prev) => [...prev, { role: 'ai', content: response }]);
+          speak(response);
+        } catch (e) {
+          setPendingAction(null);
+          setMessages((prev) => [
+            ...prev,
+            { role: 'ai', content: `❌ Failed: ${e.message}` },
+          ]);
+        }
+        return;
+      }
+
+      if (lower === 'cancel' || lower === 'no' || lower === 'না') {
+        setMessages((prev) => [
+          ...prev,
+          { role: 'user', content: userMsgText },
+          { role: 'ai', content: '❌ Action cancelled.' },
+        ]);
+        setInput('');
+        setPendingAction(null);
+        return;
+      }
+
+      // confirm/cancel ছাড়া অন্য কিছু — pending clear করে normal flow চলবে
+      setPendingAction(null);
+    }
+
+    // ── STEP 2: Normal flow ──
     const userMsg = { role: 'user', content: userMsgText };
     const newMessages = [...messagesRef.current, userMsg];
     setMessages(newMessages);
     setInput('');
 
-    // ২. মেমোরি থেকে রিলেভেন্ট তথ্য খোঁজা
-    // এখানে ডিলে বা চেক যোগ করা ভালো যদি syncAllData বড় হয়
-    const relevantData = findRelevantMemory(userMsgText);
+    // Cache ready হওয়া পর্যন্ত wait
+    await APP_MEMORY.waitUntilReady();
 
-    // DEBUG: মেমোরি চেক করো এখানে
-    console.log('[DEBUG] Memory found:', relevantData);
+    // RAG search
+    const relevantData = findRelevantMemory(userMsgText);
+    console.log('[App] RAG result:', relevantData);
 
     const context = buildContext(relevantData);
-    console.log('[DEBUG] Built Context:', context); // লগ চেক করো কি আসছে
 
     try {
       const aiResponse = await askAI(
@@ -127,11 +159,25 @@ function App() {
         getMcpClient(),
         context
       );
+
+      // ── STEP 3: Confirmation required? ──
+      if (aiResponse?.__type === 'NEEDS_CONFIRMATION') {
+        setPendingAction(aiResponse);
+        setMessages((prev) => [
+          ...prev,
+          { role: 'ai', content: aiResponse.preview },
+        ]);
+        speak(
+          'Action requires your confirmation. Please type confirm or cancel.'
+        );
+        return;
+      }
+
       setMessages((prev) => [...prev, { role: 'ai', content: aiResponse }]);
       speak(aiResponse);
     } catch (e) {
-      console.error('Error in AI matrix:', e);
-      speak('My subroutines encountered an error, Mahfuj.');
+      console.error('AI error:', e);
+      speak('Error encountered.');
     }
   };
 
@@ -161,21 +207,17 @@ function App() {
           body: formData,
         }
       );
-
       const data = await res.json();
       return data.text;
     } catch (e) {
-      console.error('[Groq Intercept] Interception failed:', e);
+      console.error('[Groq Transcribe] Failed:', e);
       return null;
     }
   };
 
   const toggleVoice = async () => {
     if (voiceState === 'listening') {
-      if (
-        mediaRecorderRef.current &&
-        mediaRecorderRef.current.state === 'recording'
-      ) {
+      if (mediaRecorderRef.current?.state === 'recording') {
         mediaRecorderRef.current.stop();
         setVoiceState('idle');
       }
@@ -201,9 +243,8 @@ function App() {
           type: 'audio/webm',
         });
         stream.getTracks().forEach((track) => track.stop());
-
         const transcript = await transcribeAudio(audioBlob);
-        if (transcript && transcript.trim().length > 0) {
+        if (transcript?.trim().length > 0) {
           setInput(transcript);
           handleSendVoice(transcript);
         }
@@ -214,7 +255,7 @@ function App() {
       setVoiceState('listening');
     } catch (e) {
       console.error('Audio capture denied:', e);
-      alert('Microphone lock engaged. K.A.R.R. demands browser permission.');
+      alert('Microphone permission required.');
     }
   };
 

@@ -1,6 +1,22 @@
 // Universal AI Router
 // Supports OpenAI-compatible APIs: Groq, Mistral, Gemini, and others.
 
+const DESTRUCTIVE_TOOLS = [
+  // Email
+  'send_personal_email',
+  'create_email_draft',
+  // Telegram
+  'send_telegram_message',
+  // Contacts
+  'add_contact',
+  'update_contact_name',
+  'sync_telegram_contacts',
+  // Calendar
+  'create_calendar_event',
+  'update_calendar_event',
+  'delete_calendar_event',
+];
+
 const PROVIDERS = [
   {
     name: 'Groq',
@@ -39,22 +55,19 @@ const PROVIDERS = [
 ];
 
 function cleanSchema(schema) {
-  if (!schema || typeof schema !== 'object') {
-    return schema;
-  }
+  if (!schema || typeof schema !== 'object') return schema;
   const cleaned = { ...schema };
   delete cleaned.$schema;
+  delete cleaned.pattern; // ← এই line যোগ করুন — invalid regex Groq reject করে
 
-  if (cleaned.properties && typeof cleaned.properties === 'object') {
+  if (cleaned.properties) {
     const newProps = {};
     for (const key of Object.keys(cleaned.properties)) {
       newProps[key] = cleanSchema(cleaned.properties[key]);
     }
     cleaned.properties = newProps;
   }
-  if (cleaned.items && typeof cleaned.items === 'object') {
-    cleaned.items = cleanSchema(cleaned.items);
-  }
+  if (cleaned.items) cleaned.items = cleanSchema(cleaned.items);
   return cleaned;
 }
 
@@ -84,11 +97,19 @@ export async function askAI(
     formattedMessages.unshift({
       role: 'system',
       content: `CRITICAL CONTEXT: You have direct access to relevant user information.
-      Use this information to answer the user's query accurately. 
-      If the information is not present in the context, use tools to find it.
-      Context: ${context}`,
+Use this information to answer the user's query accurately. 
+If the information is not present in the context, use tools to find it.
+Context: ${context}
+
+CRITICAL RULE — ACTION CONFIRMATION:
+Before executing ANY tool that sends, deletes, or modifies data, you MUST:
+1. Show the user exactly what you plan to do (recipient, content, etc.)
+2. Ask "Shall I proceed? Reply confirm or cancel."
+3. Only call the tool AFTER the user explicitly says "confirm" or "yes".
+
+Tools requiring confirmation: send_personal_email, send_telegram_message, send_whatsapp_message, delete_contact, create_meeting, update_contact.
+Never execute these tools in the same response where you first mention the action.`,
     });
-    console.log('[AI Context Check] context:', context);
   }
 
   let lastError = null;
@@ -134,6 +155,7 @@ export async function askAI(
 
             currentMessages.push(message);
 
+            // while loop-এর ভেতরে, tool_calls check-এর জায়গায়:
             if (message.tool_calls && message.tool_calls.length > 0) {
               for (const toolCall of message.tool_calls) {
                 const funcName = toolCall.function.name;
@@ -141,8 +163,17 @@ export async function askAI(
                   toolCall.function.arguments || '{}'
                 );
 
-                console.log(`[MCP] Executing: ${funcName}...`);
+                // ← HARD BLOCK — confirmation ছাড়া execute করবে না
+                if (DESTRUCTIVE_TOOLS.includes(funcName)) {
+                  return {
+                    __type: 'NEEDS_CONFIRMATION',
+                    toolName: funcName,
+                    toolArgs: funcArgs,
+                    preview: `📋 **Action Required:**\nTool: \`${funcName}\`\n\`\`\`json\n${JSON.stringify(funcArgs, null, 2)}\n\`\`\`\nConfirm করতে **"confirm"** লিখুন, বাতিল করতে **"cancel"**।`,
+                  };
+                }
 
+                // non-destructive normally execute
                 let toolResultStr;
                 try {
                   const mcpResult = await mcpClient.callTool({
@@ -153,7 +184,6 @@ export async function askAI(
                 } catch (e) {
                   toolResultStr = JSON.stringify({ error: e.message });
                 }
-
                 currentMessages.push({
                   role: 'tool',
                   tool_call_id: toolCall.id,

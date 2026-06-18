@@ -87,7 +87,9 @@ export default function Connector() {
 
   const fetchTgStatus = async () => {
     try {
-      const res = await axios.get('http://localhost:10000/telegram-auth/status');
+      const res = await axios.get(
+        'http://localhost:10000/telegram-auth/status'
+      );
       setTgStatus(res.data);
     } catch {
       setTgStatus(null);
@@ -234,7 +236,6 @@ export default function Connector() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 p-6 md:p-10 font-sans">
       <div className="max-w-4xl mx-auto space-y-10">
-
         {/* Header */}
         <header className="flex justify-between items-center border-b border-slate-800 pb-6">
           <h1 className="text-3xl font-extrabold flex items-center gap-3 text-white">
@@ -257,14 +258,18 @@ export default function Connector() {
             <input
               placeholder="Email Address"
               value={config.services?.gmail?.EMAIL_USER || ''}
-              onChange={(e) => updateService('gmail', 'EMAIL_USER', e.target.value)}
+              onChange={(e) =>
+                updateService('gmail', 'EMAIL_USER', e.target.value)
+              }
               className={`${inputCls} w-full`}
             />
             <input
               type="password"
               placeholder="App Password"
               value={config.services?.gmail?.EMAIL_PASS || ''}
-              onChange={(e) => updateService('gmail', 'EMAIL_PASS', e.target.value)}
+              onChange={(e) =>
+                updateService('gmail', 'EMAIL_PASS', e.target.value)
+              }
               className={`${inputCls} w-full`}
             />
           </div>
@@ -288,13 +293,21 @@ export default function Connector() {
                 </p>
                 <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs mt-1">
                   <span className="text-slate-500">Phone</span>
-                  <span className="text-slate-200 font-mono">{tgStatus.phone}</span>
+                  <span className="text-slate-200 font-mono">
+                    {tgStatus.phone}
+                  </span>
                   <span className="text-slate-500">API ID</span>
-                  <span className="text-slate-200 font-mono">{tgStatus.apiId}</span>
+                  <span className="text-slate-200 font-mono">
+                    {tgStatus.apiId}
+                  </span>
                   <span className="text-slate-500">API Hash</span>
-                  <span className="text-slate-200 font-mono">{tgStatus.apiHash}</span>
+                  <span className="text-slate-200 font-mono">
+                    {tgStatus.apiHash}
+                  </span>
                   <span className="text-slate-500">Session</span>
-                  <span className="text-slate-400 font-mono truncate">{tgStatus.session}</span>
+                  <span className="text-slate-400 font-mono truncate">
+                    {tgStatus.session}
+                  </span>
                 </div>
               </div>
               <button
@@ -314,8 +327,9 @@ export default function Connector() {
                   <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">
                     Step 1 — API Credentials
                   </p>
-                  
-                   <a href="https://my.telegram.org/apps"
+
+                  <a
+                    href="https://my.telegram.org/apps"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-1 text-xs text-sky-400 hover:text-sky-300 transition"
@@ -361,10 +375,14 @@ export default function Connector() {
                     {otpStatus === 'loading' ? 'Sending...' : 'Send OTP'}
                   </button>
                   {otpStatus === 'ok' && (
-                    <span className="text-xs text-emerald-400 font-medium whitespace-nowrap">OTP Sent ✓</span>
+                    <span className="text-xs text-emerald-400 font-medium whitespace-nowrap">
+                      OTP Sent ✓
+                    </span>
                   )}
                   {otpStatus === 'error' && (
-                    <span className="text-xs text-red-400 font-medium whitespace-nowrap">Failed ✗</span>
+                    <span className="text-xs text-red-400 font-medium whitespace-nowrap">
+                      Failed ✗
+                    </span>
                   )}
                 </div>
               </div>
@@ -389,10 +407,14 @@ export default function Connector() {
                     {verifyStatus === 'loading' ? '...' : 'Verify'}
                   </button>
                   {verifyStatus === 'ok' && (
-                    <span className="self-center text-xs text-emerald-400 font-medium whitespace-nowrap">Saved ✓</span>
+                    <span className="self-center text-xs text-emerald-400 font-medium whitespace-nowrap">
+                      Saved ✓
+                    </span>
                   )}
                   {verifyStatus === 'error' && (
-                    <span className="self-center text-xs text-red-400 font-medium whitespace-nowrap">Failed ✗</span>
+                    <span className="self-center text-xs text-red-400 font-medium whitespace-nowrap">
+                      Failed ✗
+                    </span>
                   )}
                 </div>
               </div>
@@ -424,13 +446,21 @@ export default function Connector() {
               Paste normal Facebook URL — RSS auto-generated via RSSHub
             </p>
             {(config.crawlers.facebookPages || []).map((pg, i) => (
-              <div key={i} className="bg-slate-950 border border-slate-800 rounded-lg p-3 flex justify-between items-start">
+              <div
+                key={i}
+                className="bg-slate-950 border border-slate-800 rounded-lg p-3 flex justify-between items-start"
+              >
                 <div>
                   <p className="text-sm font-medium text-white">{pg.name}</p>
                   <p className="text-xs text-slate-600 mt-0.5">{pg.url}</p>
-                  <p className="text-xs text-purple-500 mt-0.5">RSS → {pg.rss}</p>
+                  <p className="text-xs text-purple-500 mt-0.5">
+                    RSS → {pg.rss}
+                  </p>
                 </div>
-                <button onClick={() => removeFromList('facebookPages', i)} className="text-slate-600 hover:text-red-400 transition ml-3 mt-0.5">
+                <button
+                  onClick={() => removeFromList('facebookPages', i)}
+                  className="text-slate-600 hover:text-red-400 transition ml-3 mt-0.5"
+                >
                   <Trash2 size={14} />
                 </button>
               </div>
@@ -439,13 +469,17 @@ export default function Connector() {
               <input
                 placeholder="Page name"
                 value={fbInput.name}
-                onChange={(e) => setFbInput((p) => ({ ...p, name: e.target.value }))}
+                onChange={(e) =>
+                  setFbInput((p) => ({ ...p, name: e.target.value }))
+                }
                 className={`${inputCls} w-1/3`}
               />
               <input
                 placeholder="https://www.facebook.com/pagename"
                 value={fbInput.url}
-                onChange={(e) => setFbInput((p) => ({ ...p, url: e.target.value }))}
+                onChange={(e) =>
+                  setFbInput((p) => ({ ...p, url: e.target.value }))
+                }
                 className={`${inputCls} flex-1`}
               />
               <button
@@ -464,12 +498,18 @@ export default function Connector() {
               🎓 University Websites
             </p>
             {(config.crawlers.universityWeb || []).map((s, i) => (
-              <div key={i} className="bg-slate-950 border border-slate-800 rounded-lg p-3 flex justify-between items-center">
+              <div
+                key={i}
+                className="bg-slate-950 border border-slate-800 rounded-lg p-3 flex justify-between items-center"
+              >
                 <div>
                   <p className="text-sm font-medium text-white">{s.name}</p>
                   <p className="text-xs text-slate-600 mt-0.5">{s.url}</p>
                 </div>
-                <button onClick={() => removeFromList('universityWeb', i)} className="text-slate-600 hover:text-red-400 transition ml-3">
+                <button
+                  onClick={() => removeFromList('universityWeb', i)}
+                  className="text-slate-600 hover:text-red-400 transition ml-3"
+                >
                   <Trash2 size={14} />
                 </button>
               </div>
@@ -478,19 +518,27 @@ export default function Connector() {
               <input
                 placeholder="Site name"
                 value={uniInput.name}
-                onChange={(e) => setUniInput((p) => ({ ...p, name: e.target.value }))}
+                onChange={(e) =>
+                  setUniInput((p) => ({ ...p, name: e.target.value }))
+                }
                 className={`${inputCls} w-1/3`}
               />
               <input
                 placeholder="https://www.bu.ac.bd/notice-board"
                 value={uniInput.url}
-                onChange={(e) => setUniInput((p) => ({ ...p, url: e.target.value }))}
+                onChange={(e) =>
+                  setUniInput((p) => ({ ...p, url: e.target.value }))
+                }
                 className={`${inputCls} flex-1`}
               />
               <button
                 onClick={() => {
                   if (!uniInput.name || !uniInput.url) return;
-                  addToList('universityWeb', { name: uniInput.name, url: uniInput.url }, () => setUniInput({ name: '', url: '' }));
+                  addToList(
+                    'universityWeb',
+                    { name: uniInput.name, url: uniInput.url },
+                    () => setUniInput({ name: '', url: '' })
+                  );
                 }}
                 disabled={!uniInput.name || !uniInput.url}
                 className="flex items-center gap-1 bg-amber-600/20 hover:bg-amber-600/40 border border-amber-800 text-amber-400 px-3 py-3 rounded-lg transition disabled:opacity-30"
@@ -506,12 +554,18 @@ export default function Connector() {
               <Newspaper size={13} className="text-emerald-400" /> News Portals
             </p>
             {(config.crawlers.newsPortals || []).map((s, i) => (
-              <div key={i} className="bg-slate-950 border border-slate-800 rounded-lg p-3 flex justify-between items-center">
+              <div
+                key={i}
+                className="bg-slate-950 border border-slate-800 rounded-lg p-3 flex justify-between items-center"
+              >
                 <div>
                   <p className="text-sm font-medium text-white">{s.name}</p>
                   <p className="text-xs text-slate-600 mt-0.5">{s.url}</p>
                 </div>
-                <button onClick={() => removeFromList('newsPortals', i)} className="text-slate-600 hover:text-red-400 transition ml-3">
+                <button
+                  onClick={() => removeFromList('newsPortals', i)}
+                  className="text-slate-600 hover:text-red-400 transition ml-3"
+                >
                   <Trash2 size={14} />
                 </button>
               </div>
@@ -520,19 +574,27 @@ export default function Connector() {
               <input
                 placeholder="Portal name"
                 value={newsInput.name}
-                onChange={(e) => setNewsInput((p) => ({ ...p, name: e.target.value }))}
+                onChange={(e) =>
+                  setNewsInput((p) => ({ ...p, name: e.target.value }))
+                }
                 className={`${inputCls} w-1/3`}
               />
               <input
                 placeholder="https://prothomalo.com/feed"
                 value={newsInput.url}
-                onChange={(e) => setNewsInput((p) => ({ ...p, url: e.target.value }))}
+                onChange={(e) =>
+                  setNewsInput((p) => ({ ...p, url: e.target.value }))
+                }
                 className={`${inputCls} flex-1`}
               />
               <button
                 onClick={() => {
                   if (!newsInput.name || !newsInput.url) return;
-                  addToList('newsPortals', { name: newsInput.name, url: newsInput.url }, () => setNewsInput({ name: '', url: '' }));
+                  addToList(
+                    'newsPortals',
+                    { name: newsInput.name, url: newsInput.url },
+                    () => setNewsInput({ name: '', url: '' })
+                  );
                 }}
                 disabled={!newsInput.name || !newsInput.url}
                 className="flex items-center gap-1 bg-emerald-600/20 hover:bg-emerald-600/40 border border-emerald-800 text-emerald-400 px-3 py-3 rounded-lg transition disabled:opacity-30"
@@ -557,7 +619,10 @@ export default function Connector() {
             </button>
           </div>
           {(config.providers || []).map((p, i) => (
-            <div key={i} className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-4 shadow-inner">
+            <div
+              key={i}
+              className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-4 shadow-inner"
+            >
               <input
                 placeholder="Provider Name (e.g. Groq)"
                 value={p.name || ''}
@@ -579,7 +644,9 @@ export default function Connector() {
                   <input
                     placeholder="Models (comma separated)"
                     value={p.models ? p.models.join(', ') : ''}
-                    onChange={(e) => updateProvider(i, 'models', e.target.value)}
+                    onChange={(e) =>
+                      updateProvider(i, 'models', e.target.value)
+                    }
                     className="w-full bg-transparent outline-none text-sm"
                   />
                 </div>
@@ -605,26 +672,34 @@ export default function Connector() {
           <div className="grid md:grid-cols-2 gap-4 mb-4">
             <input
               placeholder="Client ID"
-              value={config.services?.googleCalendar?.clientId || ''}
-              onChange={(e) => updateService('googleCalendar', 'clientId', e.target.value)}
+              value={config.services?.googleCalendar?.CLIENT_ID || ''}
+              onChange={(e) =>
+                updateService('googleCalendar', 'CLIENT_ID', e.target.value)
+              }
               className={`${inputCls} w-full`}
             />
             <input
               type="password"
               placeholder="Client Secret"
-              value={config.services?.googleCalendar?.clientSecret || ''}
-              onChange={(e) => updateService('googleCalendar', 'clientSecret', e.target.value)}
+              value={config.services?.googleCalendar?.CLIENT_SECRET || ''}
+              onChange={(e) =>
+                updateService('googleCalendar', 'CLIENT_SECRET', e.target.value)
+              }
               className={`${inputCls} w-full`}
             />
           </div>
           <button
-            onClick={() => window.open('http://localhost:10000/google-service-auth/login', '_blank')}
+            onClick={() =>
+              window.open(
+                'http://localhost:10000/google-service-auth/login',
+                '_blank'
+              )
+            }
             className="w-full bg-blue-900/30 hover:bg-blue-900/50 border border-blue-800 text-blue-300 py-3 rounded-lg text-sm font-medium transition flex items-center justify-center gap-2"
           >
             <Globe size={16} /> Login with Google
           </button>
         </div>
-
       </div>
     </div>
   );
